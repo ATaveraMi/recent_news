@@ -1,0 +1,92 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+*.egg
+*.manifest
+*.spec
+
+# Virtual Environments
+venv/
+.env
+.env.*
+.venv/
+.Python
+
+# Environment variables
+*.env
+
+# FastAPI / Uvicorn / Gunicorn
+*.log
+
+# Byte-compiled / optimized / DLL files
+build/
+develop-eggs/
+dist/
+eggs/
+parts/
+lib/
+lib64/
+var/
+sdist/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+
+# PyInstaller
+# Usually these are in the root folder
+*.manifest
+*.spec
+
+# pytest
+.cache/
+.pytest_cache/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# VSCode
+.vscode/
+.settings/
+
+# IDEs
+.idea/
+*.iml
+
+# Coverage
+htmlcov/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Static / Media (if applicable)
+staticfiles/
+media/
+
+# Docker
+docker-data/
+*.pid
+
+# Local dev data
+tmp/
+logs/
+
+# Node (if you have a frontend inside)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# MacOS
+.DS_Store
