@@ -23,62 +23,98 @@ class A2AServer:
         self.connection_agents: Dict[str, str] = {}  # websocket -> agent_id
         self._setup_routes()
         
-        def _setup_routes(self):
-            """Setup routes for the server"""
-            @self.app.get("/")
-            async def root():
-                return {"message": "Welcome to the A2A Server"}
+    def _setup_routes(self):
+        """Setup routes for the server"""
+        @self.app.get("/")
+        async def root():
+            return {"message": "Welcome to the A2A Server"}
+        
+        @self.app.get("/info")
+        async def info():
+            return self.protocol.get_agent_info().to_dict()
+        
+        @self.app.post("/message")
+        async def receive_message(message_dict: dict):
+            """Receive a message via HTTP"""
+            try:
+                message = A2AMessage(**message_dict)
+
+                # Handle the message
+                response = await self.protocol.handle_message(message)
+
+                if response:
+                    return response.dict()
+                else:
+                    return {"status": "processed"}
+            except Exception as e:
+                logger.error(f"Error processing message: {e}")
+                raise HTTPException(status_code=400, detail=str(e))
             
-            @self.app.get("/info")
-            async def info():
-                return self.protocol.get_agent_info().to_dict()
-            
-            @self.app.post("/message")
-            async def receive_message(message_dict: dict):
-                """Receive a message via HTTP"""
-                try:
+        @self.app.websocket("/ws/{agent_id}")
+        async def websocket_endpoint(websocket: WebSocket, agent_id: str):
+            """WebSocket endpoint for real-time communication"""
+            await websocket.accept()
+            self.active_connections[agent_id] = websocket
+            self.connection_agents[id(websocket)] = agent_id
+
+            logger.info(f"Agent {agent_id} connected via WebSocket")
+
+            try:
+                while True:
+                    # Receive message
+                    data = await websocket.receive_text()
+                    message_dict = json.loads(data)
                     message = A2AMessage(**message_dict)
 
-                    # Handle the message
+                    # Handle message
                     response = await self.protocol.handle_message(message)
 
+                    # Send response if any
                     if response:
-                        return response.dict()
-                    else:
-                        return {"status": "processed"}
-                except Exception as e:
-                    logger.error(f"Error processing message: {e}")
-                    raise HTTPException(status_code=400, detail=str(e))
-                
-            @self.app.websocket("/ws/{agent_id}")
-            async def websocket_endpoint(websocket: WebSocket, agent_id: str):
-                """WebSocket endpoint for real-time communication"""
-                await websocket.accept()
-                self.active_connections[agent_id] = websocket
-                self.connection_agents[id(websocket)] = agent_id
+                        await websocket.send_text(response.json())
 
-                logger.info(f"Agent {agent_id} connected via WebSocket")
+            except WebSocketDisconnect:
+                logger.info(f"Agent {agent_id} disconnected")
+                self.active_connections.pop(agent_id, None)
+                self.connection_agents.pop(id(websocket), None)
+            except Exception as e:
+                logger.error(f"WebSocket error: {e}")
+                self.active_connections.pop(agent_id, None)
+                self.connection_agents.pop(id(websocket), None)
+            @self.app.get("/agents")
+            async def list_agents():
+                """List known agents"""
+                return {
+                    "agents": [
+                        agent.dict() for agent in self.protocol.known_agents.values()
+                    ]
+                }
+    async def send_to_agent(self, agent_id: str, message: A2AMessage):
+        """Send message to a specific agent via WebSocket"""
+        if agent_id in self.active_connections:
+            websocket = self.active_connections[agent_id]
+            try:
+                await websocket.send_text(message.json())
+                logger.info(f"Sent message to {agent_id} via WebSocket")
+            except Exception as e:
+                logger.error(f"Failed to send via WebSocket: {e}")
+        else:
+            logger.warning(f"Agent {agent_id} not connected via WebSocket")
 
-                try:
-                    while True:
-                        # Receive message
-                        data = await websocket.receive_text()
-                        message_dict = json.loads(data)
-                        message = A2AMessage(**message_dict)
+    def run(self):
+        """Run the server"""
+        import uvicorn
+        logger.info(f"Starting A2A server on {self.host}:{self.port}")
+        uvicorn.run(self.app, host=self.host, port=self.port)
 
-                        # Handle message
-                        response = await self.protocol.handle_message(message)
-
-                        # Send response if any
-                        if response:
-                            await websocket.send_text(response.json())
-
-                except WebSocketDisconnect:
-                    logger.info(f"Agent {agent_id} disconnected")
-                    self.active_connections.pop(agent_id, None)
-                    self.connection_agents.pop(id(websocket), None)
-                except Exception as e:
-                    logger.error(f"WebSocket error: {e}")
-                    self.active_connections.pop(agent_id, None)
-                    self.connection_agents.pop(id(websocket), None)
-            
+    async def start(self):
+        """Start server asynchronously"""
+        import uvicorn
+        config = uvicorn.Config(
+            self.app,
+            host=self.host,
+            port=self.port,
+            log_level="info"
+        )
+        server = uvicorn.Server(config)
+        await server.serve()
