@@ -10,7 +10,8 @@ import logging
 from dotenv import load_dotenv
 from agents.orchestrator import Orchestrator
 from agents.data_agent import DataAgent
-from agents.analysis_agent import AnalysisAgent
+from agents.llm_analysis_agent import LLMAnalysisAgent
+from os import getenv
 logger = logging.getLogger(__name__)
 
 class A2AServer:
@@ -126,9 +127,12 @@ logging.basicConfig(level=logging.INFO)
 load_dotenv()
 
 # Wire up agents and orchestrator
+_api_key = getenv("OPENAI_API_KEY")
+if not _api_key:
+    raise RuntimeError("OPENAI_API_KEY must be set to run LLM-based analysis.")
 _orchestrator = Orchestrator(
     data_agent=DataAgent(),
-    analysis_agent=AnalysisAgent(),
+    analysis_agent=LLMAnalysisAgent(model_name="gpt-4o-mini"),
 )
 
 _protocol = A2AProtocol(
