@@ -3,12 +3,14 @@
 Provides HTTP/WebSocket endpoints for agent communication
 """
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
-from fastapi.responses import JSONResponse
-from typing import Dict, Set
-import asyncio
-from agents.protocols.protocol import A2AProtocol, A2AMessage, AgentInfo
+from typing import Dict
+from agents.protocols.protocol import A2AProtocol, A2AMessage, AgentCapability
 import json
 import logging
+from dotenv import load_dotenv
+from agents.orchestrator import Orchestrator
+from agents.data_agent import DataAgent
+from agents.analysis_agent import AnalysisAgent
 logger = logging.getLogger(__name__)
 
 class A2AServer:
@@ -118,3 +120,35 @@ class A2AServer:
         )
         server = uvicorn.Server(config)
         await server.serve()
+
+# ----- Entrypoint / ASGI app exposure -----
+logging.basicConfig(level=logging.INFO)
+load_dotenv()
+
+# Wire up agents and orchestrator
+_orchestrator = Orchestrator(
+    data_agent=DataAgent(),
+    analysis_agent=AnalysisAgent(),
+)
+
+_protocol = A2AProtocol(
+    agent_id="reportero",
+    agent_name="Reportero",
+    capabilities=[AgentCapability.DATA_RETRIEVAL, AgentCapability.DATA_ANALYSIS],
+)
+_server = A2AServer(_protocol, host="127.0.0.1", port=8000)
+
+# Expose FastAPI app for uvicorn (e.g., `uv run uvicorn main:app --reload`)
+app = _server.app
+
+# Register handler for workflow.news
+async def handle_workflow_news(payload: dict) -> Dict:
+    params = payload.get("params") or {}
+    query = params.get("query") or params.get("topic") or "recent news"
+    email_to = params.get("email_to")
+    return await _orchestrator.run_workflow(query=query, email_to=email_to)
+
+_protocol.register_handler("workflow.news", handle_workflow_news)
+
+if __name__ == "__main__":
+    _server.run()
