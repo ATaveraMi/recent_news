@@ -6,7 +6,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.responses import JSONResponse
 from typing import Dict, Set
 import asyncio
-from agents.protocol import A2AProtocol, A2AMessage, AgentInfo
+from agents.protocols.protocol import A2AProtocol, A2AMessage, AgentInfo
 import json
 import logging
 logger = logging.getLogger(__name__)
